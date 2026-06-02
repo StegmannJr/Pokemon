@@ -23,7 +23,9 @@ let xpNeededForLevel = 100;
 let isEvolving = false;
 let evolutionIDTarget = null;
 
-const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
 
 let opponentLevel = 2;
 

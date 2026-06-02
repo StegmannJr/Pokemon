@@ -3,7 +3,6 @@ header {
 }
 
 body {
-    background-image: url("/Images/Pokemon-Game-Background.png");
     background-size: cover;
     background-position: center;
     background-attachment: fixed;
