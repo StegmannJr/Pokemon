@@ -1604,7 +1604,7 @@ function doPlayerAttack(playerMove) {
         if (opponentHpProcent > 50) {
             document.getElementById("opponent-hp-fill").style.width = `${opponentHpProcent}%`;
             document.getElementById("opponent-hp-fill").style.backgroundColor = "#4caf50";
-        } else if (opponentHpProcent < 50 && opponentHpProcent > 20) {
+        } else if (opponentHpProcent <= 50 && opponentHpProcent > 20) {
             document.getElementById("opponent-hp-fill").style.width = `${opponentHpProcent}%`;
             document.getElementById("opponent-hp-fill").style.backgroundColor = "#ff9800";
         } else {
@@ -1658,7 +1658,7 @@ function doOpponentAttack(opponentMove) {
         if (playerHpProcent > 50) {
             document.getElementById("player-hp-fill").style.width = `${playerHpProcent}%`;
             document.getElementById("player-hp-fill").style.backgroundColor = "#4caf50";
-        } else if (playerHpProcent < 50 && playerHpProcent > 20) {
+        } else if (playerHpProcent <= 50 && playerHpProcent > 20) {
             document.getElementById("player-hp-fill").style.width = `${playerHpProcent}%`;
             document.getElementById("player-hp-fill").style.backgroundColor = "#ff9800";
         } else {
