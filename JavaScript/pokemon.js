@@ -1,33 +1,51 @@
-let pokedexList = [];
-let KantoPokedex = [];
+/*
+  pokemon.js
+  --------------------
+  This file is your learning copy of pokemon.js. It has the exact same logic,
+  but with detailed explanations grouped by features so you can learn how the
+  code works in chunks.
 
-let playerParty = [];
-let currentPartyIndex = 0;
+  The goal is to help you understand the game like a map: safe towns, battle
+  routes, player state, opponent state, move calculations, and UI updates.
+*/
 
-let playerPokemon;
-let opponentPokemon = {};
+// -----------------------------------------------------------------------------
+// Game State: Variables that keep track of the player's progress and current battle
+// -----------------------------------------------------------------------------
 
-let currentMenuState = "start";
-let isBattleActive = false;
-let isPlayerTurn = true;
+let pokedexList = [];          // IDs of Pokémon the player has seen or caught.
+let KantoPokedex = [];         // The list of the first 151 Pokémon for the Pokedex UI.
 
-let isLearningMove = false;
-let moveToLearn = null;
+let playerParty = [];          // The player's team of Pokémon.
+let currentPartyIndex = 0;     // Which Pokémon in the party is currently active.
+
+let playerPokemon;             // The active player Pokémon object.
+let opponentPokemon = {};      // The current wild/opponent Pokémon object.
+
+let currentMenuState = "start"; // The current menu mode, like start, main, fight, evolve.
+let isBattleActive = false;      // True while a battle is in progress.
+let isPlayerTurn = true;         // True when the player gets to act first.
+
+let isLearningMove = false;      // True when the player must choose a move to forget.
+let moveToLearn = null;          // The new move the Pokémon is trying to learn.
 
 let encounterpool = [16, 19, 10, 13, 21, 29, 32];
+// A simple encounter pool: these are Pokémon IDs that may appear in battles.
 
-let playerLevel = 5;
-let playerXP = 0;
-let xpNeededForLevel = 100;
+let playerLevel = 5;             // The player's current level.
+let playerXP = 0;                // Current experience points toward next level.
+let xpNeededForLevel = 100;      // How much XP is needed to level up.
 
-let isEvolving = false;
-let evolutionIDTarget = null;
+let isEvolving = false;          // Set true when evolution is triggered.
+let evolutionIDTarget = null;    // The Pokémon ID to evolve into.
 
 function sleep(ms) {
+    // A small utility function that returns a promise that resolves after ms.
+    // This is used so the battle flow can pause with await and feel smoother.
     return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-let opponentLevel = 2;
+let opponentLevel = 2;           // Default opponent level to start.
 
 let playerStats = {
     attack: 0,
@@ -35,7 +53,7 @@ let playerStats = {
     specialAttack: 0,
     specialDefense: 0,
     speed: 0
-}
+};
 
 let opponentStats = {
     attack: 0,
@@ -43,29 +61,41 @@ let opponentStats = {
     specialAttack: 0,
     specialDefense: 0,
     speed: 0
-}
+};
 
+/*
+  Type chart: how different move types interact with defender types.
+  The value means:
+    2 = super effective
+    0.5 = not very effective
+    0 = no effect
+  This makes the battle system feel like classic Pokémon type matchups.
+*/
 const typeChart = {
-    normal: { rock: 0.5, ghost: 0, steel: 0.5},
-    fire: { fire: 0.5, water: 0.5, grass: 2, ice: 2, bug: 2, rock: 0.5, dragon: 0.5, steel: 2},
-    water: { fire: 2, water: 0.5, grass: 0.5, ground: 2, rock: 2, dragon: 0.5},
-    grass: { fire: 0.5, water: 2, grass: 0.5, poison: 0.5, ground: 2, flying: 0.5, bug: 0.5, rock: 2, dragon: 0.5, steel: 0.5},
-    electric: { water: 2, grass: 0.5, electric: 0.5, ground: 0, flying: 2, dragon: 0.5},
-    ice: { fire: 0.5, water: 0.5, grass: 2, ice: 0.5, ground: 2, flying: 2, dragon: 2, steel: 0.5},
-    fighting: { normal: 2, ice: 2, poison: 0.5, flying: 0.5, psychic: 0.5, bug: 0.5, rock: 2, ghost: 0, dark: 2, steel: 2, fairy: 0.5},
-    poison: { grass: 2, poison: 0.5, ground: 0.5, rock: 0.5, ghost: 0.5, steel: 0, fairy: 2},
-    ground: { fire: 2, grass: 0.5, electric: 2, poison: 2, flying: 0, bug: 0.5, rock: 2, steel: 2},
-    flying: { grass: 2, electric: 0.5, fighting: 2, bug: 2, rock: 0.5, steel: 0.5},
-    psychic: { fighting: 2, poison: 2, psychic: 0.5, dark: 0, steel: 0.5},
-    bug: { fire: 0.5, grass: 2, fighting: 0.5, poison: 0.5, flying: 0.5, psychic: 2, ghost: 0.5, dark: 2, steel: 0.5, fairy: 0.5},
-    rock: { fire: 2, ice: 2, fighting: 0.5, ground: 0.5, flying: 2, bug: 2, steel: 0.5},
-    ghost: { normal: 0, psychic: 2, ghost: 2, dark: 0.5},
-    dragon: { dragon: 2, steel: 0.5, fairy: 0},
-    dark: { fighting: 0.5, psychic: 2, ghost: 2, dark: 0.5, fairy: 0.5},
-    steel: { fire: 0.5, water: 0.5, electric: 0.5, ice: 2, rock: 2, steel: 0.5, fairy: 2},
-    fairy: { fire: 0.5, fighting: 2, poison: 0.5, dragon: 2, dark: 2, steel: 0.5}
-}
+    normal: { rock: 0.5, ghost: 0, steel: 0.5 },
+    fire: { fire: 0.5, water: 0.5, grass: 2, ice: 2, bug: 2, rock: 0.5, dragon: 0.5, steel: 2 },
+    water: { fire: 2, water: 0.5, grass: 0.5, ground: 2, rock: 2, dragon: 0.5 },
+    grass: { fire: 0.5, water: 2, grass: 0.5, poison: 0.5, ground: 2, flying: 0.5, bug: 0.5, rock: 2, dragon: 0.5, steel: 0.5 },
+    electric: { water: 2, grass: 0.5, electric: 0.5, ground: 0, flying: 2, dragon: 0.5 },
+    ice: { fire: 0.5, water: 0.5, grass: 2, ice: 0.5, ground: 2, flying: 2, dragon: 2, steel: 0.5 },
+    fighting: { normal: 2, ice: 2, poison: 0.5, flying: 0.5, psychic: 0.5, bug: 0.5, rock: 2, ghost: 0, dark: 2, steel: 2, fairy: 0.5 },
+    poison: { grass: 2, poison: 0.5, ground: 0.5, rock: 0.5, ghost: 0.5, steel: 0, fairy: 2 },
+    ground: { fire: 2, grass: 0.5, electric: 2, poison: 2, flying: 0, bug: 0.5, rock: 2, steel: 2 },
+    flying: { grass: 2, electric: 0.5, fighting: 2, bug: 2, rock: 0.5, steel: 0.5 },
+    psychic: { fighting: 2, poison: 2, psychic: 0.5, dark: 0, steel: 0.5 },
+    bug: { fire: 0.5, grass: 2, fighting: 0.5, poison: 0.5, flying: 0.5, psychic: 2, ghost: 0.5, dark: 2, steel: 0.5, fairy: 0.5 },
+    rock: { fire: 2, ice: 2, fighting: 0.5, ground: 0.5, flying: 2, bug: 2, steel: 0.5 },
+    ghost: { normal: 0, psychic: 2, ghost: 2, dark: 0.5 },
+    dragon: { dragon: 2, steel: 0.5, fairy: 0 },
+    dark: { fighting: 0.5, psychic: 2, ghost: 2, dark: 0.5, fairy: 0.5 },
+    steel: { fire: 0.5, water: 0.5, electric: 0.5, ice: 2, rock: 2, steel: 0.5, fairy: 2 },
+    fairy: { fire: 0.5, fighting: 2, poison: 0.5, dragon: 2, dark: 2, steel: 0.5 }
+};
 
+/*
+  Nature data: each Pokémon gets a nature that boosts one stat and lowers another.
+  This is a small part of the battle system that makes each Pokémon feel unique.
+*/
 const natureData = {
     Hardy:    { plus: null, minus: null },
     Lonely:   { plus: "attack", minus: "defense" },
@@ -92,8 +122,18 @@ const natureData = {
     Sassy:    { plus: "specialDefense", minus: "speed" },
     Careful:  { plus: "specialDefense", minus: "specialAttack" },
     Quirky:   { plus: null, minus: null }
-}
+};
 
+/*
+  World map structure: each area is a node in the game map.
+
+  - "Palet Town" is a safe town: requiredWaves 0 and spawnPool empty.
+  - "Route 1" is a simple route: it has a spawnPool of wild Pokémon and a level range.
+  - "Viridian City" is another hub town with no wild spawns.
+
+  Think of this as the map data that tells the game what can appear where and what
+  zone unlocks what next.
+*/
 const worldMap = {
     "Palet Town": {
         name: "Palet Town",
@@ -227,8 +267,7 @@ const worldMap = {
         spawnPool: [21, 23, 27, 96],
         minLevel: 11,
         maxLevel: 17,
-        nextZones: ["Diglets Tunnel", "Route 12", "Route 13" /* Route 12-13 is locked until player moves through Route 9 => 
-            Rock Tunnel => Route 10 => lavender town and beats Snolax */]
+        nextZones: ["Diglets Tunnel", "Route 12", "Route 13" /* Route 12-13 is locked until player moves through Route 9 => Rock Tunnel => Route 10 => lavender town and beats Snolax */]
     },
     "Route 9": {
         name: "Route 9",
@@ -264,7 +303,7 @@ const worldMap = {
     "Route 10-South": {
         name: "Route 10",
         requiredWaves: 5,
-        spawnPool: [21, 23, 66, 100, ]
+        spawnPool: [21, 23, 66, 100]
     },
     "Lavender Town": {
         name: "Lavender Town",
@@ -286,7 +325,7 @@ const worldMap = {
         spawnPool: [16, 37, 43, 52, 58, 69],
         minLevel: 17,
         maxLevel: 22,
-        nextZones: ["Celadon City"] 
+        nextZones: ["Celadon City"]
     },
     "Celadon City": {
         name: "Celadon City",
@@ -299,12 +338,12 @@ const worldMap = {
         requiredWaves: 1,
         spawnPool: []
     },
-    "Pokemon Tower": { /* Unlocks fighting snorlax and silph co. */
+    "Pokemon Tower": {
         name: "Pokémon Tower",
         requiredWaves: 10,
         spawnPool: [92, 93, 104],
         minLevel: 13,
-        maxLevel: 25 
+        maxLevel: 25
     },
     "Fighting Dojo": {
         name: "Fighting Dojo",
@@ -389,7 +428,7 @@ const worldMap = {
         requiredWaves: 10,
         spawnPool: [72, 98, 116, 129],
         minLevel: 5,
-        maxLevel: 35,
+        maxLevel: 35
     },
     "Seafoam Islands": {
         name: "Seafoam Islands",
@@ -516,8 +555,12 @@ const worldMap = {
         spawnPool: [],
         nextZones: ["Palet Town"]
     }
-}
+};
 
+/*
+  createUniqueInstances: builds a custom Pokémon instance from API data.
+  This is a core function that turns raw PokeAPI values into a game-ready Pokémon.
+*/
 function createUniqueInstances(apiTemplate, chosenLevel) {
     const ivs = {
         hp: Math.floor(Math.random() * 32),
@@ -525,11 +568,13 @@ function createUniqueInstances(apiTemplate, chosenLevel) {
         defense: Math.floor(Math.random() * 32),
         specialAttack: Math.floor(Math.random() * 32),
         specialDefense: Math.floor(Math.random() * 32),
-        speed: Math.floor(Math.random() * 32),
+        speed: Math.floor(Math.random() * 32)
     };
+    // IVs are hidden bonuses. They make each individual Pokémon slightly different.
 
     const natureList = Object.keys(natureData);
     const randomNature = natureList[Math.floor(Math.random() * natureList.length)];
+    // Choose a random nature from the nature table.
 
     const nativeMoves = apiTemplate.moves || [];
     const templateStats = apiTemplate.baseStats || apiTemplate.stats || [];
@@ -560,6 +605,10 @@ function createUniqueInstances(apiTemplate, chosenLevel) {
     };
 }
 
+/*
+  checkNewMovesForLevels: if a Pokémon evolves, this checks whether the evolved form
+  learns any new moves at the player's current level.
+*/
 function checkNewMovesForLevels(apiData, level) {
     const newMoves = [];
 
@@ -579,6 +628,10 @@ function checkNewMovesForLevels(apiData, level) {
     return newMoves;
 }
 
+/*
+  checkEvolution: fetches the Pokémon evolution chain and checks if the player
+  Pokémon is ready to evolve by level.
+*/
 async function checkEvolution() {
     if (isEvolving) return;
 
@@ -594,11 +647,9 @@ async function checkEvolution() {
 
         while (currentChainNode) {
             if (currentChainNode.species.name === playerPokemon.name.toLowerCase()) {
-                
                 if (currentChainNode.creates_with && currentChainNode.creates_with.length > 0) {
                     nextEvolutionDetails = currentChainNode.creates_with[0];
-                } 
-                else if (currentChainNode.evolves_to && currentChainNode.evolves_to.length > 0) {
+                } else if (currentChainNode.evolves_to && currentChainNode.evolves_to.length > 0) {
                     nextEvolutionDetails = currentChainNode.evolves_to[0];
                 }
                 break;
@@ -619,7 +670,7 @@ async function checkEvolution() {
                     isBattleActive = false;
 
                     await sleep(1000);
-                    
+
                     const logElement = document.getElementById("log-text");
                     if (logElement) {
                         logElement.innerHTML = `what? ${playerPokemon.name.toUpperCase()} is evolving!<br>Do you want to allow it to evolve?`;
@@ -634,6 +685,10 @@ async function checkEvolution() {
     }
 }
 
+/*
+  updatePlayerUI: refreshes the player side of the battle screen.
+  It updates the name, level, HP bar, and status badge.
+*/
 function updatePlayerUI() {
     if (!playerPokemon) return;
 
@@ -653,26 +708,32 @@ function updatePlayerUI() {
 
 function updateXPUI() {
     const xpFill = document.getElementById("player-xp-fill");
-
     if (xpFill) {
         let xpProcent = (playerXP / xpNeededForLevel) * 100;
-
         xpProcent = Math.min(100, Math.max(0, xpProcent));
-
         xpFill.style.width = `${xpProcent}%`;
     }
 }
 
+/*
+  gainXP: gives XP to the player and handles leveling up if enough XP is earned.
+
+  This function:
+    1. adds XP,
+    2. displays log text,
+    3. loops while XP >= threshold,
+    4. increases level and stats,
+    5. checks move learning and evolution.
+*/
 async function gainXP(amount) {
     const logElement = document.getElementById("log-text");
     playerXP += amount;
 
-    if (logElement) logElement.innerHTML += `<br>${playerPokemon.name.toUpperCase()} gained ${amount} XP!`
+    if (logElement) logElement.innerHTML += `<br>${playerPokemon.name.toUpperCase()} gained ${amount} XP!`;
 
     while (playerXP >= xpNeededForLevel) {
         playerXP -= xpNeededForLevel;
         playerLevel++;
-
         xpNeededForLevel = Math.floor(xpNeededForLevel * 1.2);
 
         playerPokemon.maxhp = Math.floor(playerPokemon.maxhp * 1.1);
@@ -685,18 +746,20 @@ async function gainXP(amount) {
         playerPokemon.hp = playerPokemon.maxhp;
 
         if (logElement) logElement.innerHTML = `${playerPokemon.name.toUpperCase()} grew to level ${playerLevel}!`;
-        
         await checkAndLearnNewMove(playerLevel);
     }
 
     checkEvolution();
-
     updateXPUI();
 }
 
+/*
+  checkAndLearnNewMove: when the player levels up, this checks the API to see if
+  there is a new move at that level. If there is, it either adds it directly or
+  forces the player to choose a move to forget.
+*/
 async function checkAndLearnNewMove(newLevel) {
     const logElement = document.getElementById("log-text");
-
     const response = await fetch(`https://pokeapi.co/api/v2/pokemon/${playerPokemon.id}`);
     const data = await response.json();
 
@@ -739,11 +802,8 @@ async function checkAndLearnNewMove(newLevel) {
                 isLearningMove = true;
 
                 return new Promise((resolve) => {
-                    if (logElement) logElement.innerHTML = `${playerPokemon.name.toUpperCase()} wants to learn the move 
-                    ${newMove.name.toUpperCase()}!<br>But it already knows 4 moves. Select a move to forget:`;
-
+                    if (logElement) logElement.innerHTML = `${playerPokemon.name.toUpperCase()} wants to learn the move ${newMove.name.toUpperCase()}!<br>But it already knows 4 moves. Select a move to forget:`;
                     updateMenu("learn-move");
-
                     window.resolveMoveLearning = resolve;
                 });
             }
@@ -762,12 +822,15 @@ function togglePokedex(show) {
     }
 }
 
+/*
+  chooseStarter: the first choice in the game. It loads the selected starter from
+  the API, builds a unique Pokémon instance, and starts the player's party.
+*/
 async function chooseStarter(starterId) {
     const logElement = document.getElementById("log-text");
     if (logElement) logElement.innerText = "Loading your partner...";
 
     const apiTemplate = await getPokemonData(starterId);
-
     const uniqueStarter = createUniqueInstances(apiTemplate, 5);
     reCalculateInstanceStats(uniqueStarter);
 
@@ -776,27 +839,28 @@ async function chooseStarter(starterId) {
     }
 
     playerParty = [uniqueStarter];
-
     currentPartyIndex = 0;
-
     playerPokemon = playerParty[currentPartyIndex];
-
     playerLevel = playerPokemon.level;
 
     uniqueStarter.moves = apiTemplate.moves || [];
 
     const startOverlay = document.getElementById("start-menu");
-    if (startOverlay)  { 
-        startOverlay.style.display = "none"; 
+    if (startOverlay)  {
+        startOverlay.style.display = "none";
         startOverlay.style.opacity = "0";
         startOverlay.style.pointerEvents = "none";
     }
 
     updatePlayerUI();
-
     endBattle();
+    startNewBattle();
 }
 
+/*
+  startNewBattle: begins a fresh battle against a random encounter.
+  It resets stats, selects an opponent, and updates the UI.
+*/
 async function startNewBattle() {
     isBattleActive = true;
     isPlayerTurn = true;
@@ -845,6 +909,10 @@ async function startNewBattle() {
     updateMenu("main");
 }
 
+/*
+  reCalculateInstanceStats: calculates stats from the base stats, IVs, level, and nature.
+  This is a key function because it gives each Pokémon a real HP and attack value.
+*/
 function reCalculateInstanceStats(pokemonInstance) {
     if (!pokemonInstance) return;
 
@@ -855,7 +923,6 @@ function reCalculateInstanceStats(pokemonInstance) {
     const natureEffect = natureData[natureName];
 
     const baseHP = base?.hp || pokemonInstance.stats?.[0]?.base_stat || 40;
-
     const calculatedHP = Math.floor(((2 * base.hp + (iv?.hp || 0)) * level) / 100) + level + 10;
     pokemonInstance.maxHP = calculatedHP;
     pokemonInstance.maxhp = calculatedHP;
@@ -866,27 +933,32 @@ function reCalculateInstanceStats(pokemonInstance) {
     pokemonInstance.hp = pokemonInstance.currentHP;
 
     const coreStats = ["attack", "defense", "specialAttack", "specialDefense", "speed"];
-
     coreStats.forEach(statKey => {
         let calculateValue = Math.floor(((2 * base[statKey] + iv[statKey]) * level) / 100) + 5;
-
         if (natureEffect.plus === statKey) {
             calculateValue = Math.floor(calculateValue * 1.1);
         } else if (natureEffect.minus === statKey) {
+            calculateValue = Math.floor(calculateValue * 1.1 * 0.9);
             calculateValue = Math.floor(calculateValue * 0.9);
         }
-
         pokemonInstance[statKey] = calculateValue;
     });
 }
 
+/*
+  DOM Ready: when the browser has loaded the page, fetch the Pokedex and
+  show the start menu overlay.
+*/
 window.addEventListener("DOMContentLoaded", () => {
     pokedex();
-
     const startOverlay = document.getElementById("start-menu");
     if (startOverlay) startOverlay.style.display = "flex";
 });
 
+/*
+  pokedex: loads the first 151 Pokémon names and sprite URLs from the API,
+  and stores them in KantoPokedex.
+*/
 async function pokedex() {
     const response = await fetch(`https://pokeapi.co/api/v2/pokemon?limit=151`);
     const data = await response.json();
@@ -897,11 +969,18 @@ async function pokedex() {
             id: id,
             name: pokemon.name,
             sprite: `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`
-        }
+        };
     });
-    renderPokedex();    
+    renderPokedex();
 }
 
+/*
+  renderPokedex: draws all Pokedex entries in the page. For each Pokémon:
+    - if the player has seen it, show it with its image,
+    - if not, show a silhouette and ???.
+
+  Clicking a caught Pokémon loads it as the active party member.
+*/
 function renderPokedex() {
     const grid = document.getElementById("pokedex-grid");
     if (!grid) return;
@@ -924,7 +1003,7 @@ function renderPokedex() {
             card.onclick = async () => {
                 const logElement = document.getElementById("log-text");
                 if (logElement) logElement.innerText = `Loading ${pokemon.name.toUpperCase()}...`;
-                
+
                 const apiTemplate = await getPokemonData(pokemon.id);
                 if (!apiTemplate) {
                     if (logElement) logElement.innerText = "Error loading Pokemon data.";
@@ -933,29 +1012,22 @@ function renderPokedex() {
 
                 const instancePool = createUniqueInstances(apiTemplate, 5);
                 const uniqueStarter = Array.isArray(instancePool) ? instancePool[0] : instancePool;
-
                 reCalculateInstanceStats(uniqueStarter);
 
                 playerParty = [uniqueStarter];
                 playerPokemon = uniqueStarter;
-
                 updatePlayerUI();
 
                 if (isBattleActive) {
-
                     if (logElement) logElement.innerText = `Go! ${playerPokemon.name.toUpperCase()}!`;
-            
                     togglePokedex(false);
-
                     isPlayerTurn = false;
                     updateMenu("main");
 
                     setTimeout(async () => {
                         if (!isBattleActive) return;
-
                         const randomIndex = Math.floor(Math.random() * opponentPokemon.moves.length);
                         const opponentMove = opponentPokemon.moves[randomIndex];
-
                         if (canPokemonAttack(opponentPokemon, false)) {
                             if (checkMoveHit(opponentMove, opponentPokemon.name)) {
                                 doOpponentAttack(opponentMove);
@@ -964,9 +1036,7 @@ function renderPokedex() {
 
                         setTimeout(async () => {
                             if (!isBattleActive || playerPokemon.hp <= 0 || opponentPokemon.hp <= 0) return;
-
                             const keepFighting = await applyEndResultDamage();
-
                             if (keepFighting && isBattleActive) {
                                 if (logElement) logElement.innerText = `What will ${playerPokemon.name.toUpperCase()} do?`;
                                 updateMenu("main");
@@ -974,15 +1044,11 @@ function renderPokedex() {
                             }
                         }, 1000);
                     }, 1000);
-
                 } else {
-                    if (logElement) logElement.innerText = `${playerPokemon.name.toUpperCase()} is ready to battle! press NEXT FIGHT to start.`
-                    
+                    if (logElement) logElement.innerText = `${playerPokemon.name.toUpperCase()} is ready to battle! press NEXT FIGHT to start.`;
                     togglePokedex(false);
                 }
-            }
-
-            
+            };
         } else {
             card.className = "pokedex-card unknown";
             card.innerHTML = `
@@ -996,8 +1062,12 @@ function renderPokedex() {
     });
 }
 
+/*
+  getPokemonData: fetches Pokémon details from the API and builds a simplified
+  game object with moves and stats.
+*/
 async function getPokemonData(id) {
-    const response = await fetch(`https://pokeapi.co/api/v2/pokemon/${id}`)
+    const response = await fetch(`https://pokeapi.co/api/v2/pokemon/${id}`);
     const data = await response.json();
 
     const currentLevel = typeof playerLevel !== `undefined` ? playerLevel : 5;
@@ -1010,7 +1080,6 @@ async function getPokemonData(id) {
     });
 
     const movesToFetch = playerLevelMoves.length > 0 ? playerLevelMoves.slice(0, 4) : data.moves.slice(0, 4);
-     
     const movePromises = movesToFetch.map(async (m) => {
         const moveResponse = await fetch(m.move.url);
         const moveData = await moveResponse.json();
@@ -1029,7 +1098,6 @@ async function getPokemonData(id) {
             if (finalChance === null || finalChance === undefined) {
                 finalChance = (moveData.damage_class.name === "status") ? 100 : 10;
             }
-
             statusEffect = {
                 name: moveData.meta.ailment.name,
                 chance: finalChance
@@ -1042,7 +1110,7 @@ async function getPokemonData(id) {
             type: moveData.type.name,
             damageClass: moveData.damage_class.name,
             accuracy: moveData.accuracy !== null ? moveData.accuracy : 100,
-            maxPP: moveData.pp !== null ?  moveData.pp : 35,
+            maxPP: moveData.pp !== null ? moveData.pp : 35,
             currentPP: moveData.pp !== null ? moveData.pp : 35,
             statChange: statChange,
             statusEffect: statusEffect
@@ -1060,7 +1128,6 @@ async function getPokemonData(id) {
 
     const natureKeys = Object.keys(natureData);
     const randomNature = natureKeys[Math.floor(Math.random() * natureKeys.length)];
-
     const detailedMoves = await Promise.all(movePromises);
 
     return {
@@ -1092,67 +1159,67 @@ async function getPokemonData(id) {
     };
 }
 
+/*
+  calculateDamage: the damage formula that decides how much HP a move removes.
+  It uses attacker level, move power, attack/defense stats, STAB, type effectiveness,
+  and critical hits. The final damage is also randomized slightly.
+*/
 function calculateDamage(attacker, defender, move) {
+    if (!move.power || move.power <= 0) return 0;
 
-        if (!move.power || move.power <= 0) return 0;
+    const level = (attacker.name === playerPokemon.name) ? playerLevel : opponentLevel;
+    const power = move.power || 40;
+    const isCrit = Math.random() < (1 / 24);
 
-        const level = (attacker.name === playerPokemon.name) ? playerLevel : opponentLevel;
-        const power = move.power || 40;
+    const attackerAttackStage = (attacker.name === playerPokemon.name) ? playerStats.attack : opponentStats.attack;
+    const attackerSpAtkStage = (attacker.name === playerPokemon.name) ? playerStats.specialAttack : opponentStats.specialAttack;
+    const defenderDefenseStage = (defender.name === playerPokemon.name) ? playerStats.defense : opponentStats.defense;
+    const defenderSpDefStage = (defender.name === playerPokemon.name) ? playerStats.specialDefense : opponentStats.specialDefense;
 
-        const isCrit = Math.random() < (1/24);
+    let attackStageToUse = move.damageClass === "special" ? attackerSpAtkStage : attackerAttackStage;
+    let defenseStageToUse = move.damageClass === "special" ? defenderSpDefStage : defenderDefenseStage;
 
-        let finalAttack = 0;
-        let finalDefense = 0;
+    if (isCrit) {
+        if (attackStageToUse < 0) attackStageToUse = 0;
+        if (defenseStageToUse > 0) defenseStageToUse = 0;
+    }
 
-        const attackerAttackStage = (attacker.name === playerPokemon.name) ? playerStats.attack : opponentStats.attack;
-        const attackerSpAtkStage = (attacker.name === playerPokemon.name) ? playerStats.specialAttack : opponentStats.specialAttack;
-        const defenderDefenseStage = (defender.name === playerPokemon.name) ? playerStats.defense : opponentStats.defense;
-        const defenderSpDefStage = (defender.name === playerPokemon.name) ? playerStats.specialDefense : opponentStats.specialDefense;
+    let finalAttack = move.damageClass === "special" ? attacker.specialAttack : attacker.attack;
+    let finalDefense = move.damageClass === "special" ? defender.specialDefense : defender.defense;
+    finalAttack *= getStageMultiplier(attackStageToUse);
+    finalDefense *= getStageMultiplier(defenseStageToUse);
 
-        let attackStageToUse = move.damageClass === "special" ? attackerSpAtkStage : attackerAttackStage;
-        let defenseStageToUse = move.damageClass === "special" ? defenderSpDefStage : defenderDefenseStage;
+    const adratio = finalAttack / finalDefense;
+    let damage = (((2 * level / 5 + 2) * power * adratio) / 50) + 2;
 
-        if (isCrit) {
-            if (attackStageToUse < 0) attackStageToUse = 0;
-            if (defenseStageToUse > 0) defenseStageToUse = 0;
+    if (attacker.types.includes(move.type)) {
+        damage *= 1.5; // STAB: same-type attack bonus
+    }
+
+    let typeMultiplier = 1;
+    defender.types.forEach(defType => {
+        if (typeChart[move.type] && typeChart[move.type][defType] !== undefined) {
+            typeMultiplier *= typeChart[move.type][defType];
         }
+    });
 
-        finalAttack = move.damageClass === "special" ? attacker.specialAttack : attacker.attack;
-        finalDefense = move.damageClass === "special" ? defender.specialDefense : defender.defense;
+    move.lastEffectiveness = typeMultiplier;
+    damage *= typeMultiplier;
 
-        finalAttack *= getStageMultiplier(attackStageToUse);
-        finalDefense *= getStageMultiplier(defenseStageToUse);
+    if (isCrit) {
+        damage *= 1.5;
+        move.lastHitWasCritical = true;
+    } else {
+        move.lastHitWasCritical = false;
+    }
 
-        const adratio = finalAttack / finalDefense;
-
-        let damage = (((2 * level / 5 + 2) * power * adratio) / 50) + 2;
-
-        if (attacker.types.includes(move.type)) {
-            damage *= 1.5;
-        }
-
-        let typeMultiplier = 1;
-
-        defender.types.forEach(defType => {
-            if (typeChart[move.type] && typeChart[move.type][defType] !== undefined) {
-                typeMultiplier *= typeChart[move.type][defType];
-            }
-        });
-
-        move.lastEffectiveness = typeMultiplier;
-        damage *= typeMultiplier;
-
-        if (isCrit) {
-            damage *= 1.5;
-            
-            move.lastHitWasCritical = true;
-        } else {
-            move.lastHitWasCritical = false;
-        }
-
-        return Math.floor(damage * (Math.random() * 0.15 + 0.85));
+    return Math.floor(damage * (Math.random() * 0.15 + 0.85));
 }
 
+/*
+  pokemonUpdate: similar to startNewBattle, but used when updating the current
+  battle with a new opponent. It also ensures the player has an active Pokémon.
+*/
 async function pokemonUpdate() {
     const logElement = document.getElementById("log-text");
 
@@ -1186,7 +1253,7 @@ async function pokemonUpdate() {
 
     document.getElementById("opponent-name").innerText = opponentPokemon.name.toUpperCase();
     document.getElementById("opponent-level").innerText = opponentLevel;
-    document.getElementById("opponent-sprite").src = opponentPokemon.spriteFront
+    document.getElementById("opponent-sprite").src = opponentPokemon.spriteFront;
     document.getElementById("opponent-hp-fill").style.width = "100%";
 
     opponentStats.attack = 0;
@@ -1196,25 +1263,27 @@ async function pokemonUpdate() {
     opponentStats.speed = 0;
 
     opponentPokemon.status = "none";
-
     isBattleActive = true;
     isPlayerTurn = true;
-    
+
     updateStatusUI();
     updateXPUI();
     updateMenu("main");
-    
-    if (logElement) logElement.innerHTML = `${opponentPokemon.name.toUpperCase()} attacks!<br> What will 
-        ${playerPokemon.name.toUpperCase()} do?`;
+
+    if (logElement) logElement.innerHTML = `${opponentPokemon.name.toUpperCase()} attacks!<br> What will ${playerPokemon.name.toUpperCase()} do?`;
 }
 
+/*
+  updateStatusUI: displays the status effects like sleep, poison, burn, or paralysis
+  for both the player and opponent.
+*/
 function updateStatusUI() {
     const playerStatusEl = document.getElementById("player-status");
     const opponentStatusEl = document.getElementById("opponent-status");
 
     if (playerStatusEl) {
         if (playerPokemon && playerPokemon.status && playerPokemon.status !== "none" && playerPokemon.status !== "") {
-            playerStatusEl.innerText = `[${playerPokemon.status.substring(0, 3).toUpperCase()}]`
+            playerStatusEl.innerText = `[${playerPokemon.status.substring(0, 3).toUpperCase()}]`;
             playerStatusEl.className = `status-badge ${playerPokemon.status}`;
         } else {
             playerStatusEl.innerText = "";
@@ -1234,9 +1303,13 @@ function updateStatusUI() {
 function getStageMultiplier(stage) {
     if (stage === 0) return 1;
     if (stage > 0) return (2 + stage) / 2;
-    return 2 / (2 - stage); 
+    return 2 / (2 - stage);
 }
 
+/*
+  tryApplyStatus: attempts to apply a status condition from a move.
+  It also returns text describing what happened.
+*/
 function tryApplyStatus(move, targetPokemon) {
     if (!move.statusEffect) return "";
     if (targetPokemon.status !== "none") return "";
@@ -1244,11 +1317,10 @@ function tryApplyStatus(move, targetPokemon) {
     const roll = Math.random() * 100;
     if (roll <= move.statusEffect.chance) {
         targetPokemon.status = move.statusEffect.name;
-
         updateStatusUI();
 
         if (targetPokemon.status === "sleep") {
-            targetPokemon.sleepTurns = Math.floor(Math.random() * 3) + 1
+            targetPokemon.sleepTurns = Math.floor(Math.random() * 3) + 1;
             return `<br>${targetPokemon.name.toUpperCase()} fell asleep!`;
         }
         if (targetPokemon.status === "poison") {
@@ -1267,6 +1339,10 @@ function tryApplyStatus(move, targetPokemon) {
     return "";
 }
 
+/*
+  handleMenuClick: called when a button is pressed.
+  It routes the button press based on the current menu state.
+*/
 function handleMenuClick(buttonNumber) {
     const logElement = document.getElementById("log-text");
 
@@ -1281,22 +1357,16 @@ function handleMenuClick(buttonNumber) {
         const moveIndex = buttonNumber - 1;
         if (playerPokemon.moves[moveIndex]) {
             const forgottenMoveName = playerPokemon.moves[moveIndex].name.toUpperCase();
-
             playerPokemon.moves[moveIndex] = moveToLearn;
-
             if (logElement) {
-                logElement.innerHTML = `1, 2 and... poof!<br>${playerPokemon.name.toUpperCase()} 
-                forgot ${forgottenMoveName} and learned ${moveToLearn.name.toUpperCase()}!`
+                logElement.innerHTML = `1, 2 and... poof!<br>${playerPokemon.name.toUpperCase()} forgot ${forgottenMoveName} and learned ${moveToLearn.name.toUpperCase()}!`;
             }
         }
-
         isLearningMove = false;
         moveToLearn = null;
-
         if (window.resolveMoveLearning) {
             window.resolveMoveLearning();
         }
-
         setTimeout(() => {
             endBattle();
         }, 1000);
@@ -1307,7 +1377,6 @@ function handleMenuClick(buttonNumber) {
         if (buttonNumber === 1) startNewBattle();
         else if (buttonNumber === 2) togglePokedex(true);
         else if (buttonNumber === 5) handleBackClick();
-
         return;
     }
 
@@ -1319,10 +1388,8 @@ function handleMenuClick(buttonNumber) {
         if (buttonNumber === 1) updateMenu("fight");
         else if (buttonNumber === 2) {}
         else if (buttonNumber === 3) togglePokedex(true);
-        else if (buttonNumber === 4) if(logElement) logElement.innerText = "You cannot run from this battle!";
-    }
-
-    else if (currentMenuState === "fight") {
+        else if (buttonNumber === 4) if (logElement) logElement.innerText = "You cannot run from this battle!";
+    } else if (currentMenuState === "fight") {
         const chosenMove = playerPokemon.moves[buttonNumber - 1];
         if (chosenMove) {
             if (chosenMove.currentPP <= 0) {
@@ -1334,8 +1401,11 @@ function handleMenuClick(buttonNumber) {
     }
 }
 
+/*
+  updateMenu: changes the button labels and back button depending on the state.
+*/
 function updateMenu(state) {
-    currentMenuState = state
+    currentMenuState = state;
 
     const button1 = document.getElementById("button-1");
     const button2 = document.getElementById("button-2");
@@ -1349,23 +1419,17 @@ function updateMenu(state) {
         button3.innerText = "POKEMON";
         button4.innerText = "RUN";
         if (backButton) backButton.style.display = "none";
-    }
-
-    else if (state === "fight" || state === "learn-move") {
-
+    } else if (state === "fight" || state === "learn-move") {
         const moves = playerPokemon.moves;
-
         button1.innerText = playerPokemon.moves[0] ? `${playerPokemon.moves[0].name.toUpperCase()}\nPP: ${moves[0].currentPP}/${moves[0].maxPP}` : "-";
         button2.innerText = playerPokemon.moves[1] ? `${playerPokemon.moves[1].name.toUpperCase()}\nPP: ${moves[1].currentPP}/${moves[1].maxPP}` : "-";
         button3.innerText = playerPokemon.moves[2] ? `${playerPokemon.moves[2].name.toUpperCase()}\nPP: ${moves[2].currentPP}/${moves[2].maxPP}` : "-";
         button4.innerText = playerPokemon.moves[3] ? `${playerPokemon.moves[3].name.toUpperCase()}\nPP: ${moves[3].currentPP}/${moves[3].maxPP}` : "-";
         if (backButton) {
-            backButton.style.display = "inline-block"; 
+            backButton.style.display = "inline-block";
             backButton.innerText = state === "fight" ? "BACK" : "DONT LEARN";
         }
-    }
-
-    else if (state === "evolve") {
+    } else if (state === "evolve") {
         button1.innerText = "YES";
         button2.innerText = "-";
         button3.innerText = "-";
@@ -1381,44 +1445,37 @@ function handleBackClick() {
     const logElement = document.getElementById("log-text");
 
     if (currentMenuState === "fight") {
-        updateMenu("main")
+        updateMenu("main");
         if (logElement) logElement.innerHTML = `What will ${playerPokemon.name.toUpperCase()} do?`;
-    } 
-    else if (currentMenuState === "learn-move" && isLearningMove) {
+    } else if (currentMenuState === "learn-move" && isLearningMove) {
         if (logElement) logElement.innerHTML = `What will ${playerPokemon.name.toUpperCase()} do?`;
-
         isLearningMove = false;
         moveToLearn = null;
-
-        if(window.resolveMoveLearning) {
+        if (window.resolveMoveLearning) {
             resolveMoveLearning();
         }
-        
         updateMenu("main");
-    }
-    else if (currentMenuState === "evolve" && isEvolving) {
+    } else if (currentMenuState === "evolve" && isEvolving) {
         if (logElement) logElement.innerHTML = `What will ${playerPokemon.name.toUpperCase()} do?`;
-
         isEvolving = false;
         evolutionIDTarget = null;
-
         updateMenu("main");
     }
 }
 
+/*
+  executeTurn: this is the core battle sequence when the player selects a move.
+  It resolves turn order, executes attacks, waits between actions, and checks
+  whether the battle is over.
+*/
 async function executeTurn(playerMove) {
-
     isPlayerTurn = false;
-
     const logElement = document.getElementById("log-text");
-
     playerMove.currentPP = Math.max(0, playerMove.currentPP - 1);
-
     updateMenu("fight");
 
     const playerSpeed = playerPokemon.speed * getStageMultiplier(playerStats.speed);
     const opponentSpeed = opponentPokemon.speed * getStageMultiplier(opponentStats.speed);
-
     const randomIndex = Math.floor(Math.random() * opponentPokemon.moves.length);
     const opponentMove = opponentPokemon.moves[randomIndex];
 
@@ -1428,9 +1485,7 @@ async function executeTurn(playerMove) {
                 doPlayerAttack(playerMove);
             }
         }
-
         await sleep(1000);
-        
         if (opponentPokemon.hp > 0) {
             if (canPokemonAttack(opponentPokemon, false)) {
                 if (checkMoveHit(opponentMove, opponentPokemon.name)) {
@@ -1438,7 +1493,6 @@ async function executeTurn(playerMove) {
                 }
             }
         }
-
         await sleep(1000);
         if (playerPokemon.hp > 0) {
             const keepFighting = await applyEndResultDamage();
@@ -1448,14 +1502,12 @@ async function executeTurn(playerMove) {
                 isPlayerTurn = true;
             }
         }
-            
     } else {
         if (canPokemonAttack(opponentPokemon, false)) {
             if (checkMoveHit(opponentMove, opponentPokemon.name)) {
                 doOpponentAttack(opponentMove);
             }
         }
-
         await sleep(1000);
         if (playerPokemon.hp > 0) {
             if (canPokemonAttack(playerPokemon, true)) {
@@ -1463,10 +1515,9 @@ async function executeTurn(playerMove) {
                     doPlayerAttack(playerMove);
                 }
             }
-
             await sleep(1000);
         }
-    }    
+    }
 
     if (isBattleActive) {
         if (playerPokemon.hp <= 0) {
@@ -1478,11 +1529,9 @@ async function executeTurn(playerMove) {
         if (opponentPokemon.hp <= 0) {
             if (logElement) logElement.innerHTML = `Foe ${opponentPokemon.name.toUpperCase()} fainted!`;
             await sleep(1000);
-
             if (!pokedexList.includes(opponentPokemon.id)) pokedexList.push(opponentPokemon.id);
             const xpGained = opponentLevel * 25;
             await gainXP(xpGained);
-
             if (!isEvolving && !isLearningMove) endBattle();
             return;
         }
@@ -1496,6 +1545,10 @@ async function executeTurn(playerMove) {
     }
 }
 
+/*
+  executeEvolution: replaces the player's Pokémon data with the evolved form and
+  checks if the new form also learns a move at this level.
+*/
 async function executeEvolution() {
     const logElement = document.getElementById("log-text");
     if (logElement) logElement.innerHTML = `Congratulations! Your ${playerPokemon.name.toUpperCase()} evolved!`;
@@ -1504,13 +1557,11 @@ async function executeEvolution() {
     const data = await response.json();
 
     const currentMoves = playerPokemon.moves;
-
     playerPokemon.id = data.id;
     playerPokemon.name = data.name;
     playerPokemon.spriteFront = data.sprites.front_default;
     playerPokemon.spriteBack = data.sprites.back_default;
     playerPokemon.types = data.types.map(t => t.type.name);
-
     playerPokemon.baseStats = {
         hp: data.stats[0].base_stat,
         attack: data.stats[1].base_stat,
@@ -1519,23 +1570,18 @@ async function executeEvolution() {
         specialDefense: data.stats[4].base_stat,
         speed: data.stats[5].base_stat
     };
-
     playerPokemon.level = playerLevel;
-
     reCalculateInstanceStats(playerPokemon);
     playerPokemon.currentHP = playerPokemon.maxHP;
     playerPokemon.hp = playerPokemon.maxHP;
     playerPokemon.moves = currentMoves;
 
     const evolutionMoves = checkNewMovesForLevels(data, playerLevel);
-
     for (const newMove of evolutionMoves) {
         const alreadyknows = playerPokemon.moves.some(m => m.name === newMove.name);
-
         if (!alreadyknows) {
             const moveResponse = await fetch(newMove.url);
             const moveData = await moveResponse.json();
-
             const formattedMove = {
                 name: moveData.name,
                 power: moveData.power,
@@ -1548,12 +1594,10 @@ async function executeEvolution() {
                     stat: moveData.stat_changes[0].stat.name
                 } : null
             };
-
             if (playerPokemon.moves.length < 4) {
                 playerPokemon.moves.push(formattedMove);
             } else {
                 if (logElement) logElement.innerHTML += `${playerPokemon.name.toUpperCase()} wants to learn the move ${formattedMove.name.toUpperCase()}, but already knows 4 moves!`;
-                
                 updateMenu("learn-move");
             }
         }
@@ -1564,41 +1608,39 @@ async function executeEvolution() {
     }
 
     updatePlayerUI();
-
     isEvolving = false;
     evolutionIDTarget = null;
-
     return true;
 }
 
+/*
+  doPlayerAttack: resolves the player's move. It handles status moves separately
+  from damage moves, applies stat changes, and updates the log.
+*/
 function doPlayerAttack(playerMove) {
     const logElement = document.getElementById("log-text");
     let statusText = "";
 
     if (playerMove.damageClass === "status") {
         let statText = "";
-
         if (playerMove.statChange) {
             const change = playerMove.statChange.change;
             const statName = playerMove.statChange.stat.toUpperCase();
-
             if (change < 0) {
                 if (playerMove.statChange.stat === "attack") opponentStats.attack = Math.max(-6, opponentStats.attack + change);
                 if (playerMove.statChange.stat === "defense") opponentStats.defense = Math.max(-6, opponentStats.defense + change);
                 if (playerMove.statChange.stat === "speed") opponentStats.speed = Math.max(-6, opponentStats.speed + change);
-                statText = `<br>Foe ${opponentPokemon.name.toUpperCase()}'s ${statName} fell!`
+                statText = `<br>Foe ${opponentPokemon.name.toUpperCase()}'s ${statName} fell!`;
             }
         }
 
         statusText = tryApplyStatus(playerMove, opponentPokemon);
-
         if (logElement) {
             logElement.innerHTML = `${playerPokemon.name.toUpperCase()} used ${playerMove.name.toUpperCase()}!${statText}`;
         }
     } else {
         let damageToOpponent = calculateDamage(playerPokemon, opponentPokemon, playerMove);
         opponentPokemon.hp = Math.max(0, opponentPokemon.hp - damageToOpponent);
-
         let opponentHpProcent = (opponentPokemon.hp / opponentPokemon.maxhp) * 100;
 
         if (opponentHpProcent > 50) {
@@ -1620,10 +1662,14 @@ function doPlayerAttack(playerMove) {
         if (playerMove.lastEffectiveness === 0) effectivenessText = `<br>It has no effect...`;
 
         let critText = playerMove.lastHitWasCritical ? `<br>A critical hit!` : "";
-        if (logElement) logElement.innerHTML = `${playerPokemon.name.toUpperCase()} used ${playerMove.name.toUpperCase()}!${critText}${effectivenessText}`
+        if (logElement) logElement.innerHTML = `${playerPokemon.name.toUpperCase()} used ${playerMove.name.toUpperCase()}!${critText}${effectivenessText}`;
     }
 }
 
+/*
+  doOpponentAttack: the opponent uses a move. It works the same way as the player
+  attack function but updates the player's HP and logs the result.
+*/
 function doOpponentAttack(opponentMove) {
     const logElement = document.getElementById("log-text");
     let statusText = "";
@@ -1633,7 +1679,6 @@ function doOpponentAttack(opponentMove) {
         if (opponentMove.statChange) {
             const change = opponentMove.statChange.change;
             const statName = opponentMove.statChange.stat.toUpperCase();
-
             if (change < 0) {
                 if (opponentMove.statChange.stat === "attack") playerStats.attack = Math.max(-6, playerStats.attack + change);
                 if (opponentMove.statChange.stat === "defense") playerStats.defense = Math.max(-6, playerStats.defense + change);
@@ -1643,18 +1688,15 @@ function doOpponentAttack(opponentMove) {
         }
 
         statusText = tryApplyStatus(opponentMove, playerPokemon);
-
         if (logElement) {
             logElement.innerHTML = `Foe ${opponentPokemon.name.toUpperCase()} used ${opponentMove.name.toUpperCase()}!${oppStatText}`;
         }
     } else {
-
         let damageToPlayer = calculateDamage(opponentPokemon, playerPokemon, opponentMove);
         playerPokemon.hp = Math.max(0, playerPokemon.hp - damageToPlayer);
-
         document.getElementById("player-hp-text").innerHTML = `${playerPokemon.hp}/${playerPokemon.maxhp}`;
         let playerHpProcent = (playerPokemon.hp / playerPokemon.maxhp) * 100;
-        
+
         if (playerHpProcent > 50) {
             document.getElementById("player-hp-fill").style.width = `${playerHpProcent}%`;
             document.getElementById("player-hp-fill").style.backgroundColor = "#4caf50";
@@ -1667,7 +1709,7 @@ function doOpponentAttack(opponentMove) {
         }
 
         if (opponentPokemon.hp > 0) {
-            statusText = tryApplyStatus(opponentMove, playerPokemon)
+            statusText = tryApplyStatus(opponentMove, playerPokemon);
         }
 
         let opponentEffectivenessText = "";
@@ -1683,7 +1725,6 @@ function doOpponentAttack(opponentMove) {
 function checkMoveHit(move, attackerName) {
     const logElement = document.getElementById("log-text");
     const roll = Math.random() * 100;
-
     if (roll > move.accuracy) {
         if (logElement) {
             logElement.innerHTML += `<br>${attackerName.toUpperCase()}'s attack missed!`;
@@ -1693,6 +1734,10 @@ function checkMoveHit(move, attackerName) {
     return true;
 }
 
+/*
+  canPokemonAttack: checks whether a Pokémon can act.
+  It handles sleep, paralysis, freeze, and confusion.
+*/
 function canPokemonAttack(pokemon, isPlayer) {
     const logElement = document.getElementById("log-text");
 
@@ -1732,20 +1777,16 @@ function canPokemonAttack(pokemon, isPlayer) {
             if (logElement) logElement.innerHTML += `<br>${pokemon.name.toUpperCase()} snapped out of confusion!`;
         } else {
             if (logElement) logElement.innerHTML = `${pokemon.name.toUpperCase()} is confused...`;
-
             if (Math.random() < 0.33) {
                 const selfDamage = Math.floor(pokemon.maxhp * 0.1);
                 pokemon.hp = Math.max(0, pokemon.hp - selfDamage);
-
                 if (isPlayer) {
                     document.getElementById("player-hp-text").innerHTML = `${pokemon.hp}/${pokemon.maxhp}`;
                     document.getElementById("player-hp-fill").style.width = `${(pokemon.hp / pokemon.maxhp) * 100}%`;
                 } else {
                     document.getElementById("opponent-hp-fill").style.width = `${(pokemon.hp / pokemon.maxhp) * 100}%`;
                 }
-
                 if (logElement) logElement.innerHTML += `<br>It hurt itself in its confusion!`;
-
                 if (pokemon.hp <= 0) {
                     setTimeout(() => {
                         if (logElement) logElement.innerText = `${pokemon.name.toUpperCase()} fainted!`;
@@ -1756,10 +1797,13 @@ function canPokemonAttack(pokemon, isPlayer) {
             }
         }
     }
-
     return true;
 }
 
+/*
+  applyEndResultDamage: applies damage from burn or poison at the end of each turn.
+  It returns false if either Pokémon fainted from these effects.
+*/
 async function applyEndResultDamage() {
     const logElement = document.getElementById("log-text");
     let extraLog = "";
@@ -1767,9 +1811,8 @@ async function applyEndResultDamage() {
     if (playerPokemon.status === "burn" || playerPokemon.status === "poison") {
         const dotDamage = Math.floor(playerPokemon.maxhp / 16) || 1;
         playerPokemon.hp = Math.max(0, playerPokemon.hp - dotDamage);
-
         document.getElementById("player-hp-text").innerHTML = `${playerPokemon.hp}/${playerPokemon.maxhp}`;
-        document.getElementById("player-hp-fill").style.width = `${(playerPokemon.hp / playerPokemon.maxhp) * 100}%`
+        document.getElementById("player-hp-fill").style.width = `${(playerPokemon.hp / playerPokemon.maxhp) * 100}%`;
         extraLog += `<br>${playerPokemon.name.toUpperCase()} was hurt from its ${playerPokemon.status}!`;
     }
 
@@ -1782,7 +1825,7 @@ async function applyEndResultDamage() {
 
     if (extraLog !== "" && logElement) {
         logElement.innerHTML += extraLog;
-        await sleep (1000);
+        await sleep(1000);
     }
 
     if (playerPokemon.hp <= 0 || opponentPokemon.hp <= 0) {
@@ -1791,6 +1834,10 @@ async function applyEndResultDamage() {
     return true;
 }
 
+/*
+  endBattle: cleans up after a battle.
+  It restores the button labels, resets status, and stops the battle state.
+*/
 function endBattle() {
     isBattleActive = false;
     isPlayerTurn = true;
@@ -1807,7 +1854,7 @@ function endBattle() {
     }
 
     const logElement = document.getElementById("log-text");
-    if (logElement) logElement.innerText = "Battle over! you can click on OPEN POKEDEX to swap your Pokemon"
+    if (logElement) logElement.innerText = "Battle over! you can click on OPEN POKEDEX to swap your Pokemon";
 
     document.getElementById("button-1").innerText = "NEXT FIGHT";
     document.getElementById("button-2").innerText = "OPEN POKEDEX";
