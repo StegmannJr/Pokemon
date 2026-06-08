@@ -26,7 +26,15 @@ let tier5Pool = [92, 95, 96, 98, 100, 102, 104, 106, 107];
 let tier6Pool = [108, 109, 111, 113, 114, 115, 116, 118, 120, 122, 123, 124, 125, 126];
 let tier7Pool = [127, 128, 129, 131, 132, 133, 147];
 let tier8Pool = [138, 140, 142, 143, 144, 145, 146, 150, 151];
-// A simple encounter pool: these are Pokémon IDs that may appear in battles.
+// A Tiered encounter pool based on player level.
+// Tier 1 Pool: Player level 1-15
+// Tier 2 Pool: Player level 15-25
+// Tier 3 Pool: Player level 25-35
+// Tier 4 Pool: Player level 35-50
+// Tier 5 Pool: Player level 50-60
+// Tier 6 Pool: Player level 60-70
+// Tier 7 Pool: Player level 70-80
+// Tier 8 Pool: Player level 80+
 
 let playerLevel = 5;             // The player's current level.
 let playerXP = 0;                // Current experience points toward next level.
@@ -450,7 +458,7 @@ async function startNewBattle() {
                         playerLevel < 50 ? tier4Pool :
                         playerLevel < 60 ? tier5Pool :
                         playerLevel < 70 ? tier6Pool :
-                        playerLevel < 80 ? tier7Pool : tier1Pool;
+                        playerLevel < 80 ? tier7Pool : tier8Pool;
 
     const randomIndex = Math.floor(Math.random() * encounterpool.length);
     const randomOpponent = encounterpool[randomIndex];
