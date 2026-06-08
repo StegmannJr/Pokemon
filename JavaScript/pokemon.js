@@ -18,7 +18,14 @@ let isPlayerTurn = true;         // True when the player gets to act first.
 let isLearningMove = false;      // True when the player must choose a move to forget.
 let moveToLearn = null;          // The new move the Pokémon is trying to learn.
 
-let encounterpool = [16, 19, 10, 13, 21, 29, 32];
+let tier1Pool = [16, 19, 10, 13, 21, 23, 29, 32];
+let tier2Pool = [25, 27, 37, 41, 43, 46, 48, 50];
+let tier3Pool = [52, 54, 56, 58, 60, 63, 66, 69];
+let tier4Pool = [74, 77, 79, 81, 83, 84, 88, 90];
+let tier5Pool = [92, 95, 96, 98, 100, 102, 104, 106, 107];
+let tier6Pool = [108, 109, 111, 113, 114, 115, 116, 118, 120, 122, 123, 124, 125, 126];
+let tier7Pool = [127, 128, 129, 131, 132, 133, 147];
+let tier8Pool = [138, 140, 142, 143, 144, 145, 146, 150, 151];
 // A simple encounter pool: these are Pokémon IDs that may appear in battles.
 
 let playerLevel = 5;             // The player's current level.
@@ -436,6 +443,14 @@ async function startNewBattle() {
 
     const levelOffSet = Math.floor(Math.random() * 3) - 1;
     opponentLevel = Math.max(2, playerLevel + levelOffSet);
+
+    let encounterpool = playerLevel < 15 ? tier1Pool :
+                        playerLevel < 25 ? tier2Pool :
+                        playerLevel < 35 ? tier3Pool :
+                        playerLevel < 50 ? tier4Pool :
+                        playerLevel < 60 ? tier5Pool :
+                        playerLevel < 70 ? tier6Pool :
+                        playerLevel < 80 ? tier7Pool : tier1Pool;
 
     const randomIndex = Math.floor(Math.random() * encounterpool.length);
     const randomOpponent = encounterpool[randomIndex];
