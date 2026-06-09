@@ -306,9 +306,10 @@ async function gainXP(amount) {
     while (playerXP >= xpNeededForLevel) {
         playerXP -= xpNeededForLevel;
         playerLevel++;
-        xpNeededForLevel = Math.floor((playerlevel + 1)**3 - playerLevel**3);
+        xpNeededForLevel = Math.floor((playerLevel + 1)**3 - playerLevel**3);
 
         playerPokemon.maxhp = Math.floor((2 * playerPokemon.baseStats.hp + playerPokemon.ivs.hp) * playerLevel / 100) + playerLevel + 10;
+        
         playerPokemon.attack = Math.floor(((2 * playerPokemon.baseStats.attack + playerPokemon.ivs.attack) * playerLevel / 100) + 5)
          * (natureData[playerPokemon.nature].plus === "attack" ? 1.1 : (natureData[playerPokemon.nature].minus === "attack" ? 0.9 : 1));
         
@@ -478,6 +479,7 @@ async function startNewBattle() {
     reCalculateInstanceStats(opponentPokemon);
     opponentPokemon.hp = opponentPokemon.maxhp;
     opponentPokemon.currentHP = opponentPokemon.maxHP;
+    opponentPokemon.baseXP = opponentPokemon.base_experience || 64;
 
     playerPokemon.hp = playerPokemon.maxhp;
     playerPokemon.currentHP = playerPokemon.maxHP;
