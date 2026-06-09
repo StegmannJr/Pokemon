@@ -38,7 +38,7 @@ let tier8Pool = [138, 140, 142, 143, 144, 145, 146, 150, 151];
 
 let playerLevel = 5;             // The player's current level.
 let playerXP = 0;                // Current experience points toward next level.
-let xpNeededForLevel = 100;      // How much XP is needed to level up.
+let xpNeededForLevel = (playerLevel + 1)**3 - playerLevel**3;      // How much XP is needed to level up.
 
 let isEvolving = false;          // Set true when evolution is triggered.
 let evolutionIDTarget = null;    // The Pokémon ID to evolve into.
@@ -157,6 +157,7 @@ function createUniqueInstances(apiTemplate, chosenLevel) {
         spriteBack: apiTemplate.sprites?.back_default || `https://raw.githubusercontent.com/pokeAPI/sprites/master/sprites/pokemon/back/${apiTemplate.id}.png`,
         types: apiTemplate.types,
         level: chosenLevel,
+        baseXP: apiTemplate.base_experience || 64,
         currentXP: 0,
         baseStats: {
             hp: templateStats.hp || templateStats?.[0]?.base_stat || 50,
@@ -305,14 +306,23 @@ async function gainXP(amount) {
     while (playerXP >= xpNeededForLevel) {
         playerXP -= xpNeededForLevel;
         playerLevel++;
-        xpNeededForLevel = Math.floor(xpNeededForLevel * 1.2);
+        xpNeededForLevel = Math.floor((playerlevel + 1)**3 - playerLevel**3);
 
-        playerPokemon.maxhp = Math.floor(playerPokemon.maxhp * 1.1);
-        playerPokemon.attack = Math.floor(playerPokemon.attack * 1.1);
-        playerPokemon.defense = Math.floor(playerPokemon.defense * 1.1);
-        playerPokemon.specialAttack = Math.floor(playerPokemon.specialAttack * 1.1);
-        playerPokemon.specialDefense = Math.floor(playerPokemon.specialDefense * 1.1);
-        playerPokemon.speed = Math.floor(playerPokemon.speed * 1.1);
+        playerPokemon.maxhp = Math.floor((2 * playerPokemon.baseStats.hp + playerPokemon.ivs.hp) * playerLevel / 100) + playerLevel + 10;
+        playerPokemon.attack = Math.floor(((2 * playerPokemon.baseStats.attack + playerPokemon.ivs.attack) * playerLevel / 100) + 5)
+         * (natureData[playerPokemon.nature].plus === "attack" ? 1.1 : (natureData[playerPokemon.nature].minus === "attack" ? 0.9 : 1));
+        
+        playerPokemon.defense = Math.floor(((2 * playerPokemon.baseStats.defense + playerPokemon.ivs.defense) * playerLevel / 100) + 5)
+         * (natureData[playerPokemon.nature].plus === "defense" ? 1.1 : (natureData[playerPokemon.nature].minus === "defense" ? 0.9 : 1));
+        
+        playerPokemon.specialAttack = Math.floor(((2 * playerPokemon.baseStats.specialAttack + playerPokemon.ivs.specialAttack) * playerLevel / 100) + 5)
+         * (natureData[playerPokemon.nature].plus === "specialAttack" ? 1.1 : (natureData[playerPokemon.nature].minus === "specialAttack" ? 0.9 : 1));
+        
+        playerPokemon.specialDefense = Math.floor(((2 * playerPokemon.baseStats.specialDefense + playerPokemon.ivs.specialDefense) * playerLevel / 100) + 5)
+         * (natureData[playerPokemon.nature].plus === "specialDefense" ? 1.1 : (natureData[playerPokemon.nature].minus === "specialDefense" ? 0.9 : 1));
+        
+        playerPokemon.speed = Math.floor(((2 * playerPokemon.baseStats.speed + playerPokemon.ivs.speed) * playerLevel / 100) + 5)
+         * (natureData[playerPokemon.nature].plus === "speed" ? 1.1 : (natureData[playerPokemon.nature].minus === "speed" ? 0.9 : 1));
 
         playerPokemon.hp = playerPokemon.maxhp;
 
@@ -1109,7 +1119,7 @@ async function executeTurn(playerMove) {
             if (logElement) logElement.innerHTML = `Foe ${opponentPokemon.name.toUpperCase()} fainted!`;
             await sleep(1000);
             if (!pokedexList.includes(opponentPokemon.id)) pokedexList.push(opponentPokemon.id);
-            const xpGained = opponentLevel * 25;
+            const xpGained = (1 * 1 * opponentPokemon.baseXP * 1 * opponentLevel) / (7 * 1);
             await gainXP(xpGained);
             if (!isEvolving && !isLearningMove) endBattle();
             return;
